@@ -1,8 +1,19 @@
-import app from "./app.js";
+import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import cors from "cors";
 
 dotenv.config();
+
+const app = express();
+
+app.use(cors());
+
+app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send("API Running");
+});
 
 const PORT = process.env.PORT || 5000;
 
@@ -12,7 +23,14 @@ mongoose
     console.log("MongoDB Connected");
 
     app.listen(PORT, () => {
-      console.log(`Server running on ${PORT}`);
+      console.log(
+        `Server running on ${PORT}`,
+      );
     });
   })
-  .catch((err) => console.log(err));
+  .catch((err) => {
+    console.error(
+      "MongoDB Error:",
+      err.message,
+    );
+  });
