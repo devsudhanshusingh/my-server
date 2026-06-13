@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const drinkWaterSchema = new mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     goalLiters: {
       type: Number,
       required: true,

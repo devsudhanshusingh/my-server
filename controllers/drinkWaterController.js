@@ -14,6 +14,7 @@ export const createDrinkWater = async (req, res) => {
     const goalML = goalLiters * 1000;
 
     const drinkWater = await DrinkWater.create({
+      user: req.user._id,
       goalLiters,
       goalML,
       cupSize: 250,
@@ -34,7 +35,9 @@ export const createDrinkWater = async (req, res) => {
 // Get all drink water logs
 export const getDrinkWaters = async (req, res) => {
   try {
-    const drinkWaters = await DrinkWater.find().sort({ createdAt: -1 });
+    const drinkWaters = await DrinkWater.find({ user: req.user._id }).sort({
+      createdAt: -1,
+    });
     res.json(drinkWaters);
   } catch (error) {
     res.status(500).json({
@@ -53,6 +56,7 @@ export const getTodayDrinkWater = async (req, res) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const drinkWater = await DrinkWater.findOne({
+      user: req.user._id,
       date: {
         $gte: today,
         $lt: tomorrow,
@@ -76,7 +80,10 @@ export const getTodayDrinkWater = async (req, res) => {
 // Get a single drink water log by ID
 export const getDrinkWaterById = async (req, res) => {
   try {
-    const drinkWater = await DrinkWater.findById(req.params.id);
+    const drinkWater = await DrinkWater.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!drinkWater) {
       return res.status(404).json({
@@ -97,7 +104,10 @@ export const toggleCup = async (req, res) => {
   try {
     const { cupIndex } = req.body;
 
-    const drinkWater = await DrinkWater.findById(req.params.id);
+    const drinkWater = await DrinkWater.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!drinkWater) {
       return res.status(404).json({
@@ -142,13 +152,27 @@ export const toggleCup = async (req, res) => {
 // Reset drink water log
 export const resetDrinkWater = async (req, res) => {
   try {
-    const drinkWater = await DrinkWater.findByIdAndUpdate(
-      req.params.id,
+    const current = await DrinkWater.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!current) {
+      return res.status(404).json({
+        message: "Drink water log not found",
+      });
+    }
+
+    const drinkWater = await DrinkWater.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: req.user._id,
+      },
       {
         selectedCups: [],
         filledAmount: 0,
         percentage: 0,
-        remained: (await DrinkWater.findById(req.params.id)).goalLiters,
+        remained: current.goalLiters,
         completed: false,
         completedAt: null,
       },
@@ -182,8 +206,11 @@ export const updateGoal = async (req, res) => {
 
     const goalML = goalLiters * 1000;
 
-    const drinkWater = await DrinkWater.findByIdAndUpdate(
-      req.params.id,
+    const drinkWater = await DrinkWater.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: req.user._id,
+      },
       {
         goalLiters,
         goalML,
@@ -214,7 +241,10 @@ export const updateGoal = async (req, res) => {
 // Delete drink water log
 export const deleteDrinkWater = async (req, res) => {
   try {
-    const drinkWater = await DrinkWater.findByIdAndDelete(req.params.id);
+    const drinkWater = await DrinkWater.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!drinkWater) {
       return res.status(404).json({
@@ -235,10 +265,16 @@ export const deleteDrinkWater = async (req, res) => {
 // Get statistics
 export const getStatistics = async (req, res) => {
   try {
-    const total = await DrinkWater.countDocuments();
-    const completed = await DrinkWater.countDocuments({ completed: true });
+    const total = await DrinkWater.countDocuments({ user: req.user._id });
+    const completed = await DrinkWater.countDocuments({
+      user: req.user._id,
+      completed: true,
+    });
 
     const avgGoal = await DrinkWater.aggregate([
+      {
+        $match: { user: req.user._id },
+      },
       {
         $group: {
           _id: null,

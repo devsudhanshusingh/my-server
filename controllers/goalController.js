@@ -30,6 +30,7 @@ export const createGoal = async (req, res) => {
     }
 
     const newGoal = await Goal.create({
+      user: req.user._id,
       text: text.trim(),
       date: date || null,
       countdown: date ? getCountdown(date) : "",
@@ -46,7 +47,9 @@ export const createGoal = async (req, res) => {
 // Get all goals
 export const getGoals = async (req, res) => {
   try {
-    const goals = await Goal.find().sort({ createdAt: -1 });
+    const goals = await Goal.find({ user: req.user._id }).sort({
+      createdAt: -1,
+    });
 
     const goalsWithCountdown = goals.map((goal) => ({
       ...goal.toObject(),
@@ -64,7 +67,10 @@ export const getGoals = async (req, res) => {
 // Get a single goal by ID
 export const getGoalById = async (req, res) => {
   try {
-    const goal = await Goal.findById(req.params.id);
+    const goal = await Goal.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!goal) {
       return res.status(404).json({
@@ -90,8 +96,11 @@ export const updateGoal = async (req, res) => {
   try {
     const { text, date } = req.body;
 
-    const updatedGoal = await Goal.findByIdAndUpdate(
-      req.params.id,
+    const updatedGoal = await Goal.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: req.user._id,
+      },
       {
         text: text || undefined,
         date: date || undefined,
@@ -121,8 +130,11 @@ export const updateGoal = async (req, res) => {
 // Mark goal as completed
 export const completeGoal = async (req, res) => {
   try {
-    const goal = await Goal.findByIdAndUpdate(
-      req.params.id,
+    const goal = await Goal.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: req.user._id,
+      },
       {
         completed: true,
         completedAt: new Date(),
@@ -152,7 +164,10 @@ export const completeGoal = async (req, res) => {
 // Delete a goal
 export const deleteGoal = async (req, res) => {
   try {
-    const goal = await Goal.findByIdAndDelete(req.params.id);
+    const goal = await Goal.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!goal) {
       return res.status(404).json({
@@ -173,11 +188,15 @@ export const deleteGoal = async (req, res) => {
 // Get goals statistics
 export const getStatistics = async (req, res) => {
   try {
-    const total = await Goal.countDocuments();
-    const completed = await Goal.countDocuments({ completed: true });
+    const total = await Goal.countDocuments({ user: req.user._id });
+    const completed = await Goal.countDocuments({
+      user: req.user._id,
+      completed: true,
+    });
     const pending = total - completed;
 
     const goalsWithDates = await Goal.countDocuments({
+      user: req.user._id,
       date: { $exists: true, $ne: null },
     });
 
@@ -199,6 +218,7 @@ export const getStatistics = async (req, res) => {
 export const getUpcomingGoals = async (req, res) => {
   try {
     const goals = await Goal.find({
+      user: req.user._id,
       date: { $exists: true, $ne: null },
       completed: false,
     }).sort({ date: 1 });

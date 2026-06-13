@@ -5,6 +5,8 @@ import todoRoutes from "../routes/todoRoutes.js";
 import pomodoroRoutes from "../routes/pomodoroRoutes.js";
 import drinkWaterRoutes from "../routes/drinkWaterRoutes.js";
 import goalRoutes from "../routes/goalRoutes.js";
+import authRoutes from "../routes/authRoutes.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const app = express();
 
@@ -16,11 +18,11 @@ app.get("/", (req, res) => {
   res.send("API Running");
 });
 
-app.use("/api/todos", todoRoutes);
+app.use("/api/auth", authRoutes);
 
-app.use("/api/pomodoros", pomodoroRoutes);
-app.use("/api/drink-water", drinkWaterRoutes);
-app.use("/api/goals", goalRoutes);
-
+app.use("/api/todos", authMiddleware, todoRoutes);
+app.use("/api/pomodoros", authMiddleware, pomodoroRoutes);
+app.use("/api/drink-water", authMiddleware, drinkWaterRoutes);
+app.use("/api/goals", authMiddleware, goalRoutes);
 
 export default app;

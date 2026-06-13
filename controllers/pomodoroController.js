@@ -3,7 +3,10 @@ import Pomodoro from "../models/Pomodoro.js";
 // Create a new Pomodoro session
 export const createPomodoro = async (req, res) => {
   try {
-    const pomodoro = await Pomodoro.create(req.body);
+    const pomodoro = await Pomodoro.create({
+      ...req.body,
+      user: req.user._id,
+    });
     res.status(201).json(pomodoro);
   } catch (error) {
     res.status(500).json({
@@ -15,7 +18,9 @@ export const createPomodoro = async (req, res) => {
 // Get all Pomodoro sessions
 export const getPomodoros = async (req, res) => {
   try {
-    const pomodoros = await Pomodoro.find().sort({ createdAt: -1 });
+    const pomodoros = await Pomodoro.find({ user: req.user._id }).sort({
+      createdAt: -1,
+    });
     res.json(pomodoros);
   } catch (error) {
     res.status(500).json({
@@ -27,7 +32,10 @@ export const getPomodoros = async (req, res) => {
 // Get a single Pomodoro session by ID
 export const getPomodoroById = async (req, res) => {
   try {
-    const pomodoro = await Pomodoro.findById(req.params.id);
+    const pomodoro = await Pomodoro.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
     if (!pomodoro) {
       return res.status(404).json({
         message: "Pomodoro session not found",
@@ -44,9 +52,16 @@ export const getPomodoroById = async (req, res) => {
 // Update a Pomodoro session
 export const updatePomodoro = async (req, res) => {
   try {
-    const pomodoro = await Pomodoro.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+    const pomodoro = await Pomodoro.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: req.user._id,
+      },
+      req.body,
+      {
+        new: true,
+      },
+    );
     if (!pomodoro) {
       return res.status(404).json({
         message: "Pomodoro session not found",
@@ -63,8 +78,11 @@ export const updatePomodoro = async (req, res) => {
 // Start a Pomodoro session
 export const startPomodoro = async (req, res) => {
   try {
-    const pomodoro = await Pomodoro.findByIdAndUpdate(
-      req.params.id,
+    const pomodoro = await Pomodoro.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: req.user._id,
+      },
       { isRunning: true },
       { new: true },
     );
@@ -84,8 +102,11 @@ export const startPomodoro = async (req, res) => {
 // Pause a Pomodoro session
 export const pausePomodoro = async (req, res) => {
   try {
-    const pomodoro = await Pomodoro.findByIdAndUpdate(
-      req.params.id,
+    const pomodoro = await Pomodoro.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: req.user._id,
+      },
       { isRunning: false },
       { new: true },
     );
@@ -105,8 +126,11 @@ export const pausePomodoro = async (req, res) => {
 // Reset a Pomodoro session
 export const resetPomodoro = async (req, res) => {
   try {
-    const pomodoro = await Pomodoro.findByIdAndUpdate(
-      req.params.id,
+    const pomodoro = await Pomodoro.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: req.user._id,
+      },
       {
         timeLeft: 1500,
         isRunning: false,
@@ -130,12 +154,26 @@ export const resetPomodoro = async (req, res) => {
 // Complete a Pomodoro session
 export const completePomodoro = async (req, res) => {
   try {
-    const pomodoro = await Pomodoro.findByIdAndUpdate(
-      req.params.id,
+    const existingPomodoro = await Pomodoro.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!existingPomodoro) {
+      return res.status(404).json({
+        message: "Pomodoro session not found",
+      });
+    }
+
+    const pomodoro = await Pomodoro.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        user: req.user._id,
+      },
       {
         completed: true,
         completedAt: new Date(),
-        sessions: (await Pomodoro.findById(req.params.id)).sessions + 1,
+        sessions: existingPomodoro.sessions + 1,
         isRunning: false,
       },
       { new: true },
@@ -156,7 +194,10 @@ export const completePomodoro = async (req, res) => {
 // Delete a Pomodoro session
 export const deletePomodoro = async (req, res) => {
   try {
-    const pomodoro = await Pomodoro.findByIdAndDelete(req.params.id);
+    const pomodoro = await Pomodoro.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user._id,
+    });
     if (!pomodoro) {
       return res.status(404).json({
         message: "Pomodoro session not found",
@@ -175,9 +216,15 @@ export const deletePomodoro = async (req, res) => {
 // Get statistics
 export const getStatistics = async (req, res) => {
   try {
-    const total = await Pomodoro.countDocuments();
-    const completed = await Pomodoro.countDocuments({ completed: true });
+    const total = await Pomodoro.countDocuments({ user: req.user._id });
+    const completed = await Pomodoro.countDocuments({
+      user: req.user._id,
+      completed: true,
+    });
     const totalSessions = await Pomodoro.aggregate([
+      {
+        $match: { user: req.user._id },
+      },
       {
         $group: {
           _id: null,
