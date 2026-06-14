@@ -51,6 +51,19 @@ const getPeriodRange = (type, date = new Date()) => {
   return null;
 };
 
+const getCopyCompletionDate = (task, period, type) => {
+  if (type !== "Weekly") {
+    return new Date(period.targetStart);
+  }
+
+  const taskDate = new Date(task.completionDate);
+  const dayOffset = Math.floor(
+    (taskDate.getTime() - period.sourceStart.getTime()) / DAY_IN_MS,
+  );
+
+  return new Date(period.targetStart.getTime() + dayOffset * DAY_IN_MS);
+};
+
 // CREATE TASK
 export const createTodo = async (req, res) => {
   try {
@@ -128,7 +141,7 @@ export const copyTasks = async (req, res) => {
         type: task.type,
         text: task.text,
         completed: false,
-        completionDate: new Date(period.targetStart),
+        completionDate: getCopyCompletionDate(task, period, type),
       }));
 
     if (!copiedTasks.length) {
