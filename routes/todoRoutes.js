@@ -13,6 +13,8 @@ router.post("/", createTodo);
 
 router.get("/", getTodos);
 
+router.post("/copy", copyTasks);
+
 router.put("/complete/:id", completeTodo);
 
 router.delete("/:id", deleteTodo);

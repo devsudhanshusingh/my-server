@@ -4,32 +4,11 @@ import Todo from "../models/Todo.js";
 
 export const createTodo = async (req, res) => {
   try {
-    const today = new Date();
-
-    const template = await Todo.create({
-      user: req.user._id,
-
-      type: req.body.type,
-
-      text: req.body.text,
-
-      completionDate: today,
-
-      isTemplate: true,
-    });
-
     const task = await Todo.create({
       user: req.user._id,
-
       type: req.body.type,
-
       text: req.body.text,
-
-      completionDate: today,
-
-      parentTask: template._id,
-
-      isTemplate: false,
+      completionDate: req.body.completionDate || new Date(),
     });
 
     res.status(201).json(task);
@@ -40,77 +19,86 @@ export const createTodo = async (req, res) => {
   }
 };
 
-// CREATE NEXT OCCURRENCE
 
-const createNextTasks = async (userId) => {
-  const templates = await Todo.find({
-    user: userId,
+export const copyTasks = async (req, res) => {
+  try {
+    const { type } = req.body;
 
-    isTemplate: true,
+    const now = new Date();
 
-    deleted: false,
-  });
+    let sourceDate = new Date(now);
+    let targetDate = new Date(now);
 
-  for (const template of templates) {
-    let lastTask = await Todo.findOne({
-      parentTask: template._id,
-    }).sort({
-      completionDate: -1,
+    if (type === "Daily") {
+      sourceDate.setDate(now.getDate());
+      targetDate.setDate(now.getDate() + 1);
+    }
+
+    if (type === "Weekly") {
+      targetDate.setDate(now.getDate() + 7);
+    }
+
+    if (type === "Monthly") {
+      targetDate.setMonth(now.getMonth() + 1);
+    }
+
+    if (type === "Yearly") {
+      targetDate.setFullYear(now.getFullYear() + 1);
+    }
+
+    sourceDate.setHours(0, 0, 0, 0);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const nextDayExists = await Todo.find({
+      user: req.user._id,
+      type,
+      completionDate: targetDate,
+      deleted: false,
     });
 
-    let nextDate = new Date(lastTask.completionDate);
-
-    if (template.type === "Daily") {
-      nextDate.setDate(nextDate.getDate() + 1);
-    }
-
-    if (template.type === "Weekly") {
-      nextDate.setDate(nextDate.getDate() + 7);
-    }
-
-    if (template.type === "Monthly") {
-      nextDate.setMonth(nextDate.getMonth() + 1);
-    }
-
-    if (template.type === "Yearly") {
-      nextDate.setFullYear(nextDate.getFullYear() + 1);
-    }
-
-    const alreadyExist = await Todo.findOne({
-      parentTask: template._id,
-
-      completionDate: nextDate,
-    });
-
-    if (!alreadyExist) {
-      await Todo.create({
-        user: userId,
-
-        type: template.type,
-
-        text: template.text,
-
-        completionDate: nextDate,
-
-        parentTask: template._id,
-
-        isTemplate: false,
+    if (nextDayExists.length > 0) {
+      return res.status(400).json({
+        message: "Tasks already copied",
       });
     }
+
+    const tasks = await Todo.find({
+      user: req.user._id,
+      type,
+      deleted: false,
+      completionDate: {
+        $gte: sourceDate,
+        $lt: new Date(sourceDate.getTime() + 86400000),
+      },
+    });
+
+    const copiedTasks = tasks.map((task) => ({
+      user: req.user._id,
+      type: task.type,
+      text: task.text,
+      completed: false,
+      completionDate: targetDate,
+    }));
+
+    await Todo.insertMany(copiedTasks);
+
+    res.json({
+      message: "Tasks copied successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
+
 
 // GET ALL TASKS
 
 export const getTodos = async (req, res) => {
   try {
-    await createNextTasks(req.user._id);
-
     const todos = await Todo.find({
       user: req.user._id,
-
-      isTemplate: false,
-
       deleted: false,
     }).sort({
       completionDate: 1,

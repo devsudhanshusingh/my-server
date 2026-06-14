@@ -8,12 +8,6 @@ const todoSchema = new mongoose.Schema(
       required: true,
     },
 
-    parentTask: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Todo",
-      default: null,
-    },
-
     type: {
       type: String,
       enum: ["Daily", "Weekly", "Monthly", "Yearly"],
@@ -34,13 +28,6 @@ const todoSchema = new mongoose.Schema(
     completionDate: {
       type: Date,
       required: true,
-    },
-
-    // true = original task
-    // false = generated occurrence
-    isTemplate: {
-      type: Boolean,
-      default: false,
     },
 
     deleted: {
