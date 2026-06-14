@@ -26,53 +26,114 @@ export const copyTasks = async (req, res) => {
 
     const now = new Date();
 
-    let sourceDate = new Date(now);
-    let targetDate = new Date(now);
+    let sourceStart = new Date();
+    let sourceEnd = new Date();
 
+    let targetDate = new Date();
+
+    // DAILY: yesterday -> today
     if (type === "Daily") {
-      sourceDate.setDate(now.getDate());
-      targetDate.setDate(now.getDate() + 1);
+      sourceStart.setDate(now.getDate() - 1);
+      sourceEnd.setDate(now.getDate() - 1);
+
+      sourceStart.setHours(0, 0, 0, 0);
+      sourceEnd.setHours(23, 59, 59, 999);
+
+      targetDate.setHours(0, 0, 0, 0);
     }
 
+    // WEEKLY: last monday-sunday -> this monday-sunday
     if (type === "Weekly") {
-      targetDate.setDate(now.getDate() + 7);
+      const day = now.getDay();
+      const mondayOffset = day === 0 ? -6 : 1 - day;
+
+      // current week monday
+      const currentMonday = new Date(now);
+      currentMonday.setDate(now.getDate() + mondayOffset);
+      currentMonday.setHours(0, 0, 0, 0);
+
+      // previous week monday
+      sourceStart = new Date(currentMonday);
+      sourceStart.setDate(currentMonday.getDate() - 7);
+
+      sourceEnd = new Date(sourceStart);
+      sourceEnd.setDate(sourceStart.getDate() + 6);
+      sourceEnd.setHours(23, 59, 59, 999);
+
+      targetDate = currentMonday;
     }
 
+    // MONTHLY: last month -> current month
     if (type === "Monthly") {
-      targetDate.setMonth(now.getMonth() + 1);
+      sourceStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+      sourceEnd = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        0,
+        23,
+        59,
+        59,
+        999,
+      );
+
+      targetDate = new Date(now.getFullYear(), now.getMonth(), 1);
     }
 
+    // YEARLY: last year -> current year
     if (type === "Yearly") {
-      targetDate.setFullYear(now.getFullYear() + 1);
+      sourceStart = new Date(now.getFullYear() - 1, 0, 1);
+
+      sourceEnd = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+
+      targetDate = new Date(now.getFullYear(), 0, 1);
     }
 
-    sourceDate.setHours(0, 0, 0, 0);
-    targetDate.setHours(0, 0, 0, 0);
-
-    const nextDayExists = await Todo.find({
-      user: req.user._id,
-      type,
-      completionDate: targetDate,
-      deleted: false,
-    });
-
-    if (nextDayExists.length > 0) {
-      return res.status(400).json({
-        message: "Tasks already copied",
-      });
-    }
-
-    const tasks = await Todo.find({
+    // prevent duplicate copy
+    const existingTasks = await Todo.find({
       user: req.user._id,
       type,
       deleted: false,
       completionDate: {
-        $gte: sourceDate,
-        $lt: new Date(sourceDate.getTime() + 86400000),
+        $gte: targetDate,
+        $lt: new Date(
+          targetDate.getTime() +
+            (type === "Daily"
+              ? 86400000
+              : type === "Weekly"
+                ? 86400000 * 7
+                : type === "Monthly"
+                  ? 86400000 * 31
+                  : 86400000 * 365),
+        ),
       },
     });
 
-    const copiedTasks = tasks.map((task) => ({
+    if (existingTasks.length > 0) {
+      return res.status(400).json({
+        message: "Tasks already exist",
+      });
+    }
+
+    // fetch previous tasks
+    const previousTasks = await Todo.find({
+      user: req.user._id,
+      type,
+      deleted: false,
+      completionDate: {
+        $gte: sourceStart,
+        $lte: sourceEnd,
+      },
+    });
+
+    if (!previousTasks.length) {
+      return res.status(400).json({
+        message: "No previous tasks found",
+      });
+    }
+
+    // copy tasks
+    const copiedTasks = previousTasks.map((task) => ({
       user: req.user._id,
       type: task.type,
       text: task.text,
