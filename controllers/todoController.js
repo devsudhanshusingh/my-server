@@ -1,13 +1,13 @@
 import Todo from "../models/Todo.js";
 
 // CREATE TASK
-
 export const createTodo = async (req, res) => {
   try {
     const task = await Todo.create({
       user: req.user._id,
       type: req.body.type,
       text: req.body.text,
+      completed: false,
       completionDate: req.body.completionDate || new Date(),
     });
 
@@ -19,7 +19,7 @@ export const createTodo = async (req, res) => {
   }
 };
 
-
+// COPY TASKS
 export const copyTasks = async (req, res) => {
   try {
     const { type } = req.body;
@@ -28,10 +28,9 @@ export const copyTasks = async (req, res) => {
 
     let sourceStart = new Date();
     let sourceEnd = new Date();
-
     let targetDate = new Date();
 
-    // DAILY: yesterday -> today
+    // DAILY
     if (type === "Daily") {
       sourceStart.setDate(now.getDate() - 1);
       sourceEnd.setDate(now.getDate() - 1);
@@ -42,28 +41,31 @@ export const copyTasks = async (req, res) => {
       targetDate.setHours(0, 0, 0, 0);
     }
 
-    // WEEKLY: last monday-sunday -> this monday-sunday
+    // WEEKLY
     if (type === "Weekly") {
       const day = now.getDay();
       const mondayOffset = day === 0 ? -6 : 1 - day;
 
-      // current week monday
       const currentMonday = new Date(now);
+
       currentMonday.setDate(now.getDate() + mondayOffset);
+
       currentMonday.setHours(0, 0, 0, 0);
 
-      // previous week monday
       sourceStart = new Date(currentMonday);
+
       sourceStart.setDate(currentMonday.getDate() - 7);
 
       sourceEnd = new Date(sourceStart);
+
       sourceEnd.setDate(sourceStart.getDate() + 6);
+
       sourceEnd.setHours(23, 59, 59, 999);
 
-      targetDate = currentMonday;
+      targetDate = new Date(currentMonday);
     }
 
-    // MONTHLY: last month -> current month
+    // MONTHLY
     if (type === "Monthly") {
       sourceStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
@@ -80,7 +82,7 @@ export const copyTasks = async (req, res) => {
       targetDate = new Date(now.getFullYear(), now.getMonth(), 1);
     }
 
-    // YEARLY: last year -> current year
+    // YEARLY
     if (type === "Yearly") {
       sourceStart = new Date(now.getFullYear() - 1, 0, 1);
 
@@ -89,7 +91,7 @@ export const copyTasks = async (req, res) => {
       targetDate = new Date(now.getFullYear(), 0, 1);
     }
 
-    // prevent duplicate copy
+    // Prevent duplicate copy
     const existingTasks = await Todo.find({
       user: req.user._id,
       type,
@@ -115,7 +117,7 @@ export const copyTasks = async (req, res) => {
       });
     }
 
-    // fetch previous tasks
+    // Get previous tasks
     const previousTasks = await Todo.find({
       user: req.user._id,
       type,
@@ -132,13 +134,13 @@ export const copyTasks = async (req, res) => {
       });
     }
 
-    // copy tasks
+    // Copy tasks
     const copiedTasks = previousTasks.map((task) => ({
       user: req.user._id,
       type: task.type,
       text: task.text,
       completed: false,
-      completionDate: targetDate,
+      completionDate: new Date(targetDate),
     }));
 
     await Todo.insertMany(copiedTasks);
@@ -153,9 +155,7 @@ export const copyTasks = async (req, res) => {
   }
 };
 
-
 // GET ALL TASKS
-
 export const getTodos = async (req, res) => {
   try {
     const todos = await Todo.find({
@@ -174,12 +174,10 @@ export const getTodos = async (req, res) => {
 };
 
 // COMPLETE TASK
-
 export const completeTodo = async (req, res) => {
   try {
     const todo = await Todo.findOne({
       _id: req.params.id,
-
       user: req.user._id,
     });
 
@@ -190,6 +188,33 @@ export const completeTodo = async (req, res) => {
     }
 
     todo.completed = !todo.completed;
+
+    await todo.save();
+
+    res.json(todo);
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+// UPDATE TASK
+export const updateTodo = async (req, res) => {
+  try {
+    const todo = await Todo.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+      deleted: false,
+    });
+
+    if (!todo) {
+      return res.status(404).json({
+        message: "Task not found",
+      });
+    }
+
+    todo.text = req.body.text || todo.text;
 
     await todo.save();
 
@@ -222,34 +247,6 @@ export const deleteTodo = async (req, res) => {
     res.json({
       message: "Task deleted successfully",
     });
-  } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
-  }
-};
-
-
-// UPDATE TASK
-export const updateTodo = async (req, res) => {
-  try {
-    const todo = await Todo.findOne({
-      _id: req.params.id,
-      user: req.user._id,
-      deleted: false,
-    });
-
-    if (!todo) {
-      return res.status(404).json({
-        message: "Task not found",
-      });
-    }
-
-    todo.text = req.body.text || todo.text;
-
-    await todo.save();
-
-    res.json(todo);
   } catch (error) {
     res.status(500).json({
       message: error.message,
