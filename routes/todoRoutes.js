@@ -1,11 +1,22 @@
 import express from "express";
 
-import { createTodo, getTodos } from "../controllers/todoController.js";
+import {
+  createTodo,
+  getTodos,
+  completeTodo,
+  deleteTodo,
+} from "../controllers/todoController.js";
+
+import protect from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", createTodo);
+router.post("/", protect, createTodo);
 
-router.get("/", getTodos);
+router.get("/", protect, getTodos);
+
+router.put("/complete/:id", protect, completeTodo);
+
+router.delete("/:id", protect, deleteTodo);
 
 export default router;
