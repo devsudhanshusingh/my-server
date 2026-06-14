@@ -189,7 +189,7 @@ export const completeTodo = async (req, res) => {
       });
     }
 
-    todo.completed = true;
+    todo.completed = !todo.completed;
 
     await todo.save();
 
@@ -201,41 +201,55 @@ export const completeTodo = async (req, res) => {
   }
 };
 
-// DELETE COMPLETE SERIES
-
+// DELETE SINGLE TASK
 export const deleteTodo = async (req, res) => {
   try {
-    const todo = await Todo.findById(req.params.id);
+    const todo = await Todo.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!todo) {
       return res.status(404).json({
-        message: "Not found",
+        message: "Task not found",
       });
     }
 
-    let rootId = todo.isTemplate ? todo._id : todo.parentTask;
+    todo.deleted = true;
 
-    await Todo.updateMany(
-      {
-        $or: [
-          {
-            _id: rootId,
-          },
-
-          {
-            parentTask: rootId,
-          },
-        ],
-      },
-
-      {
-        deleted: true,
-      },
-    );
+    await todo.save();
 
     res.json({
-      message: "Task removed permanently",
+      message: "Task deleted successfully",
     });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+
+// UPDATE TASK
+export const updateTodo = async (req, res) => {
+  try {
+    const todo = await Todo.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+      deleted: false,
+    });
+
+    if (!todo) {
+      return res.status(404).json({
+        message: "Task not found",
+      });
+    }
+
+    todo.text = req.body.text || todo.text;
+
+    await todo.save();
+
+    res.json(todo);
   } catch (error) {
     res.status(500).json({
       message: error.message,

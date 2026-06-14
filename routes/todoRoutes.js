@@ -17,6 +17,8 @@ router.post("/copy", copyTasks);
 
 router.put("/complete/:id", completeTodo);
 
-router.delete("/:id", deleteTodo);
+router.put("/edit/:id", protect, updateTodo);
+
+router.delete("/:id", protect, deleteTodo);
 
 export default router;
