@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret123";
-const JWT_EXPIRES_IN = "7d";
+const JWT_EXPIRES_IN = "30d";
 
 export const signup = async (req, res) => {
   try {

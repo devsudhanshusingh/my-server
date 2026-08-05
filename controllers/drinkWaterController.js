@@ -46,7 +46,7 @@ export const getDrinkWaters = async (req, res) => {
   }
 };
 
-// Get today's drink water log
+// Get today's drink water log (Auto-create if not existing)
 export const getTodayDrinkWater = async (req, res) => {
   try {
     const today = new Date();
@@ -55,7 +55,7 @@ export const getTodayDrinkWater = async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const drinkWater = await DrinkWater.findOne({
+    let drinkWater = await DrinkWater.findOne({
       user: req.user._id,
       date: {
         $gte: today,
@@ -64,8 +64,25 @@ export const getTodayDrinkWater = async (req, res) => {
     });
 
     if (!drinkWater) {
-      return res.status(404).json({
-        message: "No drink water log for today",
+      // Get user's most recent goal setting, or default to 2 Liters
+      const lastLog = await DrinkWater.findOne({ user: req.user._id }).sort({
+        createdAt: -1,
+      });
+
+      const goalLiters = lastLog ? lastLog.goalLiters : 2;
+      const goalML = goalLiters * 1000;
+
+      drinkWater = await DrinkWater.create({
+        user: req.user._id,
+        goalLiters,
+        goalML,
+        cupSize: 250,
+        selectedCups: [],
+        filledAmount: 0,
+        percentage: 0,
+        remained: goalLiters,
+        completed: false,
+        date: today,
       });
     }
 
@@ -76,6 +93,7 @@ export const getTodayDrinkWater = async (req, res) => {
     });
   }
 };
+
 
 // Get a single drink water log by ID
 export const getDrinkWaterById = async (req, res) => {
